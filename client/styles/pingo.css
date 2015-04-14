@@ -1,0 +1,54 @@
+.just-one-more-button {
+  font-size:0.7em;
+  line-height:1.0em;
+  margin-right: 1em;
+  background-color: #2e1f20;
+  display: block;
+  padding: 0.5em 1.5em;
+  position:relative;
+  border-radius: 3px;
+}
+.just-one-more-button:link,
+.just-one-more-button:visited {
+  color: #fff;
+}
+
+.just-one-more-button + .just-one-more {
+  display:none;
+}
+
+.just-one-more-button.active,
+.just-one-more-button:active {
+  margin-right: 1em;
+  margin-bottom: -3px;
+  background-color: #2e1f20;
+  box-shadow: 1px 2px 2px rgba(0,0,0,0.8);
+  display: block;
+  border-radius: 3px 3px 0 0;
+  top:-3px;
+}
+
+.just-one-more-button:active + .just-one-more,
+.just-one-more-button.active + .just-one-more {
+  display:block;
+}
+
+.just-one-more {
+  background-color:#2e1f20;
+  border-radius:2px;
+  box-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+  max-width:800px;
+  padding: 1em 3em;
+  position:absolute;
+  right: 0;
+}
+.just-one-more label {
+  color: #fff;
+}
+
+.just-one-more input:focus {
+  /* background-color:#fc0;*/
+  transition: 0.2s linear background-color;
+  border:1px dotted #fff;
+}
+

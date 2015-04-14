@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" href="styles/screen.css">
+    <link rel="stylesheet" href="styles/site.css">
+    <link rel="stylesheet" href="styles/pingo.css">
+  </head>
+  <body>
+
+    <div class="content" style="min-height:800px;">
+      <section class="container">
+        <h1>Pingo</h1>
+        <div class="pull-right" style="position:relative;">
+          <a href="#" class="just-one-more-button">Add more</a>
+          <form class="just-one-more" id="add-one">
+            <div class="control-group">
+              <label for="name">Name</label>
+              <div class="controls">
+                <input type="text" id="name" name="name" value="test" />
+              </div>
+            </div>
+
+            <!--<div class="control-group">
+              <label for="type">Type</label>
+              <div class="controls">
+                <select id="type" name="type">
+                  <option value="ping">Ping</option>
+                </select>
+              </div>
+            </div>
+            -->
+
+            <div class="control-group">
+              <label for="name">Url</label>
+              <div class="controls">
+                <input type="text" id="url" name="url" value="http://localhost:3202" />
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <input class="btn" type="submit" />
+            </div>
+          </form>
+
+        </div>
+        <h4>Active Tasks</h4>
+
+        <div id="root"></div>
+      </section>
+    </div>
+
+    <script src="/scripts/vendor/frumpy/frumpy.js"></script>
+    <script src="/scripts/vendor/frumpy/plugins/xhr.js"></script>
+    <script src="/scripts/main.js"></script>
+
+  </body>
+</html>
+
