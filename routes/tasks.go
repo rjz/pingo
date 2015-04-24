@@ -18,7 +18,7 @@ type TaskRequest struct {
 
 // Global taskManager
 // TODO: persist this somewhere...
-var taskManager = task.New()
+var taskManager = task.NewManager()
 
 func validateTask(t TaskRequest) app.ValidationResult {
 	errors := app.NewValidator()
@@ -28,7 +28,7 @@ func validateTask(t TaskRequest) app.ValidationResult {
 	}
 
 	// Require unique names
-	if taskManager.Find(t.Name) != nil {
+	if taskManager.Tasks.Find(t.Name) != nil {
 		errors.Invalid("name", t.Name)
 	}
 
@@ -89,13 +89,16 @@ func CreateTask(w http.ResponseWriter, r *http.Request, _ httprouter.Params) err
 
 // GET /tasks
 func ListTasks(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
-	app.WriteJson(w, taskManager.Tasks())
+	response := make(map[string]interface{})
+	response["tasks"] = taskManager.Tasks
+	response["failed"] = taskManager.FailedTasks
+	app.WriteJson(w, response)
 	return nil
 }
 
 // GET /tasks/:id
 func ShowTask(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	task := taskManager.Find(p.ByName("id"))
+	task := taskManager.Tasks.Find(p.ByName("id"))
 	if task == nil {
 		return app.HttpError(http.StatusNotFound)
 	}

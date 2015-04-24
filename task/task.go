@@ -1,6 +1,7 @@
 package task
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -26,4 +27,20 @@ func (t Task) Reschedule() Task {
 	rescheduledTask := t
 	rescheduledTask.ScheduledTime = rescheduledTask.ScheduledTime.Add(timeOffset)
 	return rescheduledTask
+}
+
+func (t Task) MarshalJSON() ([]byte, error) {
+	ma := make(map[string]interface{})
+	ma["name"] = t.Name
+	ma["time"] = t.ScheduledTime
+	ma["data"] = t.Runner
+	ma["maxFailures"] = t.MaxFailures
+	ma["repeat"] = t.Repeat
+	switch {
+	case t.failures > 0:
+		ma["status"] = "STATUS_FAILING"
+	default:
+		ma["status"] = "STATUS_OK"
+	}
+	return json.Marshal(ma)
 }

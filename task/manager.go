@@ -8,17 +8,37 @@ import (
 	"time"
 )
 
-type Manager struct {
-	tasks []Task
-	*sync.Mutex
-	*log.Logger
-	*time.Ticker
+type TaskList []Task
+
+func (tasks *TaskList) Find(name string) *Task {
+	for _, task := range *tasks {
+		if task.Name == name {
+			return &task
+		}
+	}
+	return nil
 }
 
-func New() *Manager {
-	logger := log.New(os.Stdout, fmt.Sprintf("[task] "), log.Flags())
-	manager := Manager{Logger: logger, Mutex: new(sync.Mutex)}
-	manager.Ticker = time.NewTicker(time.Second)
+func newTaskList() TaskList {
+	return make(TaskList, 0)
+}
+
+type Manager struct {
+	FailedTasks TaskList
+	Tasks       TaskList
+	*log.Logger
+	*time.Ticker
+	*sync.Mutex
+}
+
+func NewManager() *Manager {
+	manager := Manager{
+		Logger:      log.New(os.Stdout, fmt.Sprintf("[task] "), log.Flags()),
+		Mutex:       &sync.Mutex{},
+		Tasks:       newTaskList(),
+		Ticker:      time.NewTicker(time.Second),
+		FailedTasks: newTaskList(),
+	}
 
 	go func() {
 		for _ = range manager.Ticker.C {
@@ -29,13 +49,13 @@ func New() *Manager {
 	return &manager
 }
 
-func (manager *Manager) groomedTasks() []Task {
-	pendingTasks := make([]Task, 0)
-	activeTasks := make([]Task, 0)
+func (manager *Manager) groomedTasks() TaskList {
+	pendingTasks := newTaskList()
+	activeTasks := newTaskList()
 	now := time.Now()
 
 	manager.Lock()
-	for _, t := range manager.tasks {
+	for _, t := range manager.Tasks {
 		if t.ScheduledTime.After(now) {
 			pendingTasks = append(pendingTasks, t)
 			continue
@@ -43,7 +63,7 @@ func (manager *Manager) groomedTasks() []Task {
 
 		activeTasks = append(activeTasks, t)
 	}
-	manager.tasks = pendingTasks
+	manager.Tasks = pendingTasks
 	manager.Unlock()
 
 	return activeTasks
@@ -51,13 +71,14 @@ func (manager *Manager) groomedTasks() []Task {
 
 func (manager *Manager) syncAdd(t Task) (err error) {
 	manager.Lock()
-	manager.tasks = append(manager.tasks, t)
+	manager.Tasks = append(manager.Tasks, t)
 	manager.Unlock()
 	return nil
 }
 
 func (manager *Manager) fail(t Task) {
 	manager.Logger.Println(t.Name, t.failures, TaskError("failed after retries."))
+	manager.FailedTasks = append(manager.FailedTasks, t)
 }
 
 func (manager *Manager) runOne(t Task) {
@@ -91,29 +112,13 @@ func (manager *Manager) runAll() {
 }
 
 func (manager *Manager) Add(t Task) error {
+	manager.Lock()
+	if manager.Tasks.Find(t.Name) != nil {
+		manager.Unlock()
+		return TaskError("Task already exists!")
+	}
 	manager.Logger.Println(t.Name, "added for", t.ScheduledTime)
-	manager.syncAdd(t)
+	manager.Tasks = append(manager.Tasks, t)
+	manager.Unlock()
 	return nil
-}
-
-func (manager *Manager) Remove(name string) (err error) {
-	tp := manager.Find(name)
-	if tp == nil {
-		return TaskError("Doesn't exist.")
-	}
-
-	return nil
-}
-
-func (manager *Manager) Find(name string) (tp *Task) {
-	for _, task := range manager.tasks {
-		if task.Name == name {
-			return &task
-		}
-	}
-	return
-}
-
-func (manager *Manager) Tasks() []Task {
-	return manager.tasks
 }
