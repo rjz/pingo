@@ -28,7 +28,7 @@ func validateTask(t TaskRequest) app.ValidationResult {
 	}
 
 	// Require unique names
-	if taskManager.Tasks.Find(t.Name) != nil {
+	if taskManager.Find(t.Name) != nil {
 		errors.Invalid("name", t.Name)
 	}
 
@@ -78,9 +78,7 @@ func CreateTask(w http.ResponseWriter, r *http.Request, _ httprouter.Params) err
 		Repeat:        time.Second,
 	}
 
-	if err := taskManager.Add(t); err != nil {
-		return app.HttpError(http.StatusInternalServerError)
-	}
+	taskManager.Queue(t)
 
 	app.WriteJson(w, t)
 
@@ -90,7 +88,7 @@ func CreateTask(w http.ResponseWriter, r *http.Request, _ httprouter.Params) err
 // GET /tasks
 func ListTasks(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
 	response := make(map[string]interface{})
-	response["tasks"] = taskManager.Tasks
+	response["tasks"] = taskManager.Tasks()
 	response["failed"] = taskManager.FailedTasks
 	app.WriteJson(w, response)
 	return nil
@@ -98,7 +96,7 @@ func ListTasks(w http.ResponseWriter, r *http.Request, _ httprouter.Params) erro
 
 // GET /tasks/:id
 func ShowTask(w http.ResponseWriter, r *http.Request, p httprouter.Params) error {
-	task := taskManager.Tasks.Find(p.ByName("id"))
+	task := taskManager.Find(p.ByName("id"))
 	if task == nil {
 		return app.HttpError(http.StatusNotFound)
 	}

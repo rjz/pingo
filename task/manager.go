@@ -8,72 +8,58 @@ import (
 	"time"
 )
 
-type TaskList []Task
-
-func (tasks *TaskList) Find(name string) *Task {
-	for _, task := range *tasks {
-		if task.Name == name {
-			return &task
-		}
-	}
-	return nil
-}
-
-func newTaskList() TaskList {
-	return make(TaskList, 0)
-}
-
 type Manager struct {
 	FailedTasks TaskList
-	Tasks       TaskList
+	ActionChan  chan TaskAction
+	tasks       TaskList
 	*log.Logger
 	*time.Ticker
-	*sync.Mutex
 }
 
 func NewManager() *Manager {
+	actionChan := make(chan TaskAction, 50)
 	manager := Manager{
 		Logger:      log.New(os.Stdout, fmt.Sprintf("[task] "), log.Flags()),
-		Mutex:       &sync.Mutex{},
-		Tasks:       newTaskList(),
+		tasks:       make(TaskList, 0),
 		Ticker:      time.NewTicker(time.Second),
-		FailedTasks: newTaskList(),
+		FailedTasks: make(TaskList, 0),
+		ActionChan:  actionChan,
 	}
 
 	go func() {
 		for _ = range manager.Ticker.C {
-			manager.runAll()
+			now := time.Now()
+
+			for _, t := range manager.tasks {
+				if t.ScheduledTime.Before(now) {
+					manager.ActionChan <- TaskAction{actionRemove, t}
+					manager.ActionChan <- TaskAction{actionRun, t}
+				}
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			action := <-actionChan
+			switch action.Action {
+			case actionAdd:
+				manager.addTask(action.Task)
+			case actionRemove:
+				manager.removeTask(action.Task)
+			case actionRun:
+				go manager.runOne(action.Task)
+			case actionReschedule:
+				manager.addTask(action.Task.Reschedule())
+			case actionFail:
+				manager.fail(action.Task)
+			default:
+				fmt.Println("unknown action!!")
+			}
 		}
 	}()
 
 	return &manager
-}
-
-func (manager *Manager) groomedTasks() TaskList {
-	pendingTasks := newTaskList()
-	activeTasks := newTaskList()
-	now := time.Now()
-
-	manager.Lock()
-	for _, t := range manager.Tasks {
-		if t.ScheduledTime.After(now) {
-			pendingTasks = append(pendingTasks, t)
-			continue
-		}
-
-		activeTasks = append(activeTasks, t)
-	}
-	manager.Tasks = pendingTasks
-	manager.Unlock()
-
-	return activeTasks
-}
-
-func (manager *Manager) syncAdd(t Task) (err error) {
-	manager.Lock()
-	manager.Tasks = append(manager.Tasks, t)
-	manager.Unlock()
-	return nil
 }
 
 func (manager *Manager) fail(t Task) {
@@ -86,39 +72,42 @@ func (manager *Manager) runOne(t Task) {
 		t.failures += 1
 		manager.Logger.Println(t.Name, t.failures, err)
 
-		if t.failures >= t.MaxFailures {
-			manager.fail(t)
+		if t.failures > t.MaxFailures {
+			manager.ActionChan <- TaskAction{actionFail, t}
 			return
 		}
 
-		manager.syncAdd(t.Reschedule())
+		manager.ActionChan <- TaskAction{actionReschedule, t}
 		return
 	}
 
 	t.failures = 0
-	manager.syncAdd(t.Reschedule())
+	manager.ActionChan <- TaskAction{actionReschedule, t}
 }
 
-// Run all tasks set to run before current time
-func (manager *Manager) runAll() {
-	ts := manager.groomedTasks()
-	for _, task := range ts {
-		task := task
-		go func() {
-			manager.runOne(task)
-			return
-		}()
-	}
-}
-
-func (manager *Manager) Add(t Task) error {
-	manager.Lock()
-	if manager.Tasks.Find(t.Name) != nil {
-		manager.Unlock()
-		return TaskError("Task already exists!")
-	}
+func (manager *Manager) addTask(t Task) {
+	manager.tasks = append(manager.tasks, t)
 	manager.Logger.Println(t.Name, "added for", t.ScheduledTime)
-	manager.Tasks = append(manager.Tasks, t)
-	manager.Unlock()
-	return nil
+}
+
+func (manager *Manager) removeTask(t Task) {
+	i := manager.tasks.IndexOf(t)
+	if i < 0 {
+		manager.Logger.Println(fmt.Sprintf("Task '%s' isn't in list", t.Name))
+		return
+	}
+
+	manager.tasks = append(manager.tasks[:i], manager.tasks[i+1:]...)
+}
+
+func (manager *Manager) Tasks() TaskList {
+	return manager.tasks
+}
+
+func (manager *Manager) Find(name string) *Task {
+	return manager.tasks.Find(name)
+}
+
+func (manager *Manager) Queue(t Task) {
+	manager.ActionChan <- TaskAction{actionAdd, t}
 }
